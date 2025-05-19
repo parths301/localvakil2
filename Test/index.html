@@ -1,0 +1,1384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LocalVakil - AI Legal Assistant for Indian Law Students</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Custom CSS for chat bubbles and animations */
+        .user-message {
+            background-color: #3b82f6;
+            color: white;
+            border-radius: 18px 18px 0 18px;
+            max-width: 80%;
+            align-self: flex-end;
+        }
+        
+        .ai-message {
+            background-color: #f3f4f6;
+            color: #1f2937;
+            border-radius: 18px 18px 18px 0;
+            max-width: 80%;
+            align-self: flex-start;
+        }
+        
+        .typing-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #6b7280;
+            margin-right: 4px;
+            animation: bounce 1.5s infinite ease-in-out;
+        }
+        
+        .typing-indicator:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        
+        .typing-indicator:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        
+        @keyframes bounce {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-8px); }
+        }
+        
+        .subject-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .ad-container {
+            min-height: 90px;
+            background-color: #f9fafb;
+            border: 1px dashed #d1d5db;
+        }
+        
+        /* Auth modal styles */
+        .auth-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .auth-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        
+        .auth-tabs {
+            display: flex;
+            border-bottom: 1px solid #e5e7eb;
+            margin-bottom: 1.5rem;
+        }
+        
+        .auth-tab {
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+        
+        .auth-tab.active {
+            border-bottom-color: #3b82f6;
+            color: #3b82f6;
+            font-weight: 600;
+        }
+        
+        /* Donate modal styles */
+        .donate-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .donate-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        
+        /* Mobile responsive adjustments */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                position: fixed;
+                top: 0;
+                left: 0;
+                height: 100vh;
+                z-index: 50;
+                transition: transform 0.3s ease-in-out;
+            }
+            
+            .sidebar-open {
+                transform: translateX(0);
+            }
+            
+            .mobile-menu-button {
+                display: block;
+            }
+            
+            .auth-content, .donate-content {
+                width: 95%;
+                padding: 1.5rem;
+            }
+        }
+        
+        /* Model selector styles */
+        .model-selector {
+            position: absolute;
+            bottom: 100%;
+            right: 0;
+            margin-bottom: 8px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            padding: 8px;
+            z-index: 10;
+            display: none;
+        }
+        
+        .model-option {
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+        
+        .model-option:hover {
+            background-color: #f3f4f6;
+        }
+        
+        .model-option.active {
+            background-color: #e5e7eb;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans">
+    <!-- Auth Modal -->
+    <div id="authModal" class="auth-modal">
+        <div class="auth-content">
+            <div class="auth-tabs">
+                <div class="auth-tab active" id="loginTab">Login</div>
+                <div class="auth-tab" id="registerTab">Register</div>
+            </div>
+            
+            <div id="loginForm">
+                <h2 class="text-xl font-bold mb-4">Login to LocalVakil</h2>
+                <div class="mb-4">
+                    <label class="block text-gray-700 mb-2" for="loginEmail">Email</label>
+                    <input type="email" id="loginEmail" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                </div>
+                <div class="mb-6">
+                    <label class="block text-gray-700 mb-2" for="loginPassword">Password</label>
+                    <input type="password" id="loginPassword" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                </div>
+                <button id="loginButton" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">Login</button>
+                <p class="text-center text-sm text-gray-500 mt-4">Don't have an account? <span class="text-blue-600 cursor-pointer" id="switchToRegister">Register here</span></p>
+            </div>
+            
+            <div id="registerForm" style="display: none;">
+                <h2 class="text-xl font-bold mb-4">Create an Account</h2>
+                <div class="mb-4">
+                    <label class="block text-gray-700 mb-2" for="registerName">Full Name</label>
+                    <input type="text" id="registerName" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 mb-2" for="registerEmail">Email</label>
+                    <input type="email" id="registerEmail" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 mb-2" for="registerPassword">Password</label>
+                    <input type="password" id="registerPassword" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                </div>
+                <div class="mb-6">
+                    <label class="block text-gray-700 mb-2" for="registerConfirmPassword">Confirm Password</label>
+                    <input type="password" id="registerConfirmPassword" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                </div>
+                <button id="registerButton" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">Register</button>
+                <p class="text-center text-sm text-gray-500 mt-4">Already have an account? <span class="text-blue-600 cursor-pointer" id="switchToLogin">Login here</span></p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Donate Modal -->
+    <div id="donateModal" class="donate-modal">
+        <div class="donate-content">
+            <h2 class="text-xl font-bold mb-4">Support LocalVakil</h2>
+            <p class="text-gray-600 mb-6">Your donation helps us maintain and improve this free legal education resource for Indian law students.</p>
+            
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div class="donate-option border border-gray-200 rounded-md p-4 text-center cursor-pointer hover:border-blue-500">
+                    <div class="text-2xl mb-2">₹100</div>
+                    <div class="text-sm text-gray-500">Basic Support</div>
+                </div>
+                <div class="donate-option border border-gray-200 rounded-md p-4 text-center cursor-pointer hover:border-blue-500">
+                    <div class="text-2xl mb-2">₹500</div>
+                    <div class="text-sm text-gray-500">Silver Support</div>
+                </div>
+                <div class="donate-option border border-gray-200 rounded-md p-4 text-center cursor-pointer hover:border-blue-500">
+                    <div class="text-2xl mb-2">₹1000</div>
+                    <div class="text-sm text-gray-500">Gold Support</div>
+                </div>
+                <div class="donate-option border border-gray-200 rounded-md p-4 text-center cursor-pointer hover:border-blue-500">
+                    <div class="text-2xl mb-2">₹5000</div>
+                    <div class="text-sm text-gray-500">Platinum Support</div>
+                </div>
+            </div>
+            
+            <div class="mb-4">
+                <label class="block text-gray-700 mb-2">Custom Amount (₹)</label>
+                <input type="number" id="customAmount" class="w-full px-3 py-2 border border-gray-300 rounded-md" placeholder="Enter amount">
+            </div>
+            
+            <div class="flex space-x-4">
+                <button id="cancelDonate" class="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300">Cancel</button>
+                <button id="confirmDonate" class="flex-1 bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700">Donate</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Menu Button -->
+    <div class="md:hidden fixed top-4 left-4 z-50">
+        <button id="mobileMenuButton" class="p-2 rounded-md bg-white shadow-md text-gray-700">
+            <i class="fas fa-bars"></i>
+        </button>
+    </div>
+
+    <!-- Sidebar -->
+    <div id="sidebar" class="sidebar w-64 bg-white shadow-md fixed h-full overflow-y-auto">
+        <div class="p-4 border-b border-gray-200">
+            <div class="flex items-center space-x-2">
+                <i class="fas fa-balance-scale text-blue-600 text-2xl"></i>
+                <h1 class="text-xl font-bold text-gray-800">LocalVakil</h1>
+            </div>
+            <p class="text-sm text-gray-500 mt-1">AI Legal Assistant for Indian Law Students</p>
+        </div>
+        
+        <!-- User Profile Section -->
+        <div id="userProfileSection" class="p-4 border-b border-gray-200" style="display: none;">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                    <i class="fas fa-user text-blue-500"></i>
+                </div>
+                <div>
+                    <div id="userName" class="font-medium text-gray-800">John Doe</div>
+                    <div id="userEmail" class="text-xs text-gray-500">john@example.com</div>
+                </div>
+            </div>
+            <div class="mt-3 flex space-x-2">
+                <button id="viewHistoryBtn" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded">
+                    <i class="fas fa-history mr-1"></i> History
+                </button>
+                <button id="logoutBtn" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded">
+                    <i class="fas fa-sign-out-alt mr-1"></i> Logout
+                </button>
+            </div>
+        </div>
+        
+        <!-- Chat History Section -->
+        <div id="chatHistorySection" class="p-4 border-b border-gray-200" style="display: none;">
+            <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Recent Chats</h2>
+            <div id="chatHistoryList" class="space-y-2">
+                <!-- Chat history items will be added here dynamically -->
+            </div>
+        </div>
+        
+        <div class="p-4">
+            <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wider">Core Subjects</h2>
+            <div class="mt-3 space-y-2">
+                <button class="subject-btn w-full text-left p-2 rounded-md hover:bg-gray-100" data-subject="constitution">
+                    <i class="fas fa-landmark mr-2 text-blue-500"></i> Constitutional Law
+                </button>
+                <button class="subject-btn w-full text-left p-2 rounded-md hover:bg-gray-100" data-subject="ipc">
+                    <i class="fas fa-gavel mr-2 text-red-500"></i> IPC & CrPC
+                </button>
+                <button class="subject-btn w-full text-left p-2 rounded-md hover:bg-gray-100" data-subject="contract">
+                    <i class="fas fa-file-signature mr-2 text-green-500"></i> Contract Law
+                </button>
+                <button class="subject-btn w-full text-left p-2 rounded-md hover:bg-gray-100" data-subject="property">
+                    <i class="fas fa-home mr-2 text-yellow-500"></i> Property Law
+                </button>
+                <button class="subject-btn w-full text-left p-2 rounded-md hover:bg-gray-100" data-subject="torts">
+                    <i class="fas fa-user-injured mr-2 text-purple-500"></i> Law of Torts
+                </button>
+                <button class="subject-btn w-full text-left p-2 rounded-md hover:bg-gray-100" data-subject="evidence">
+                    <i class="fas fa-search mr-2 text-indigo-500"></i> Evidence Act
+                </button>
+                <button class="subject-btn w-full text-left p-2 rounded-md hover:bg-gray-100" data-subject="family">
+                    <i class="fas fa-users mr-2 text-pink-500"></i> Family Law
+                </button>
+                <button class="subject-btn w-full text-left p-2 rounded-md hover:bg-gray-100" data-subject="tax">
+                    <i class="fas fa-rupee-sign mr-2 text-teal-500"></i> Tax Law
+                </button>
+            </div>
+            
+            <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mt-6">Specialized Areas</h2>
+            <div class="mt-3 space-y-2">
+                <button class="subject-btn w-full text-left p-2 rounded-md hover:bg-gray-100" data-subject="cyber">
+                    <i class="fas fa-laptop-code mr-2 text-blue-400"></i> Cyber Law
+                </button>
+                <button class="subject-btn w-full text-left p-2 rounded-md hover:bg-gray-100" data-subject="environment">
+                    <i class="fas fa-leaf mr-2 text-green-400"></i> Environmental Law
+                </button>
+                <button class="subject-btn w-full text-left p-2 rounded-md hover:bg-gray-100" data-subject="humanrights">
+                    <i class="fas fa-hands-helping mr-2 text-red-400"></i> Human Rights
+                </button>
+                <button class="subject-btn w-full text-left p-2 rounded-md hover:bg-gray-100" data-subject="corporate">
+                    <i class="fas fa-building mr-2 text-gray-400"></i> Corporate Law
+                </button>
+            </div>
+            
+            <div class="mt-6 pt-4 border-t border-gray-200">
+                <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wider">Exam Preparation</h2>
+                <div class="mt-3 space-y-2">
+                    <button class="subject-btn w-full text-left p-2 rounded-md hover:bg-gray-100" data-subject="previous">
+                        <i class="fas fa-book-open mr-2 text-purple-400"></i> Previous Year Papers
+                    </button>
+                    <button class="subject-btn w-full text-left p-2 rounded-md hover:bg-gray-100" data-subject="mocks">
+                        <i class="fas fa-clipboard-check mr-2 text-yellow-400"></i> Mock Tests
+                    </button>
+                    <button class="subject-btn w-full text-left p-2 rounded-md hover:bg-gray-100" data-subject="viva">
+                        <i class="fas fa-comments mr-2 text-indigo-400"></i> Viva Preparation
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Ad Space in Sidebar -->
+            <div class="mt-6 ad-container rounded-md flex items-center justify-center">
+                <span class="text-gray-400 text-sm">Advertisement Space</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="md:ml-64">
+        <!-- Header -->
+        <header class="bg-white shadow-sm">
+            <div class="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex justify-between items-center">
+                <div>
+                    <h1 class="text-xl font-bold text-gray-800">LocalVakil AI</h1>
+                    <p class="text-sm text-gray-500" id="current-subject">Constitutional Law Assistant</p>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <!-- Donate Button -->
+                    <button id="donateBtn" class="bg-green-100 text-green-700 py-1 px-3 rounded-md hover:bg-green-200 flex items-center">
+                        <i class="fas fa-heart mr-2"></i> Support Us
+                    </button>
+                    
+                    <!-- Theme Toggle Button -->
+                    <button id="themeToggle" class="p-2 rounded-full hover:bg-gray-100">
+                        <i id="themeIcon" class="fas fa-moon text-gray-500"></i>
+                    </button>
+                    
+                    <!-- User Button -->
+                    <button id="authButton" class="p-2 rounded-full hover:bg-gray-100">
+                        <i class="fas fa-user text-gray-500"></i>
+                    </button>
+                    <button class="p-2 rounded-full hover:bg-gray-100">
+                        <i class="fas fa-cog text-gray-500"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Ad Banner -->
+        <div class="bg-blue-50 border-b border-blue-100">
+            <div class="max-w-7xl mx-auto px-4 py-2 sm:px-6 lg:px-8">
+                <div class="ad-container rounded-md flex items-center justify-center">
+                    <span class="text-blue-400 text-sm">Premium Law Book Advertisement</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Chat Container -->
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex flex-col h-[calc(100vh-180px)] bg-white rounded-lg shadow-sm border border-gray-200">
+                <!-- Chat Messages -->
+                <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4">
+                    <!-- Welcome Message -->
+                    <div class="ai-message p-4">
+                        <div class="font-semibold text-gray-700 mb-1 flex items-center">
+                            <i class="fas fa-landmark mr-2 text-blue-500"></i> Constitutional Law Expert
+                        </div>
+                        <p class="text-gray-800">Welcome to LocalVakil! I'm your AI assistant specialized in Constitutional Law of India. I can help you with:</p>
+                        <ul class="list-disc pl-5 mt-2 space-y-1">
+                            <li>Fundamental Rights and DPSP</li>
+                            <li>Important Constitutional Amendments</li>
+                            <li>Landmark Supreme Court Judgments</li>
+                            <li>Center-State Relations</li>
+                            <li>Emergency Provisions</li>
+                        </ul>
+                        <p class="mt-2 text-gray-800">What would you like to learn about today?</p>
+                    </div>
+                    
+                    <!-- Sample Chat for Constitutional Law -->
+                    <div class="user-message p-4">
+                        Can you explain the basic structure doctrine?
+                    </div>
+                    <div class="ai-message p-4">
+                        <div class="font-semibold text-gray-700 mb-1 flex items-center">
+                            <i class="fas fa-landmark mr-2 text-blue-500"></i> Constitutional Law Expert
+                        </div>
+                        <p class="text-gray-800">The Basic Structure Doctrine was established in the landmark case of Kesavananda Bharati v. State of Kerala (1973). It holds that while Parliament has the power to amend the Constitution under Article 368, it cannot alter its "basic structure". The Supreme Court did not explicitly define what constitutes the basic structure, but it includes features like:</p>
+                        <ul class="list-disc pl-5 mt-2 space-y-1">
+                            <li>Supremacy of the Constitution</li>
+                            <li>Republican and democratic form of government</li>
+                            <li>Secular character of the Constitution</li>
+                            <li>Separation of powers</li>
+                            <li>Federalism</li>
+                            <li>Judicial review</li>
+                        </ul>
+                        <p class="mt-2 text-gray-800">This doctrine acts as a limitation on the amending power of Parliament.</p>
+                    </div>
+                </div>
+                
+                <!-- Chat Input with Model Selector -->
+                <div class="border-t border-gray-200 p-4">
+                    <div class="relative">
+                        <textarea id="message-input" rows="1" class="w-full border border-gray-300 rounded-md pl-4 pr-32 py-3 focus:ring-blue-500 focus:border-blue-500" placeholder="Ask your legal question..."></textarea>
+                        
+                        <!-- Model Selector Button -->
+                        <div class="absolute right-2 bottom-2 flex items-center space-x-2">
+                            <div class="relative">
+                                <button id="modelSelectorBtn" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded-full flex items-center">
+                                    <i class="fas fa-robot mr-1"></i> GPT-4
+                                    <i class="fas fa-chevron-down ml-1 text-xs"></i>
+                                </button>
+                                
+                                <!-- Model Selector Dropdown -->
+                                <div id="modelSelector" class="model-selector">
+                                    <div class="model-option active" data-model="gpt-4">
+                                        <i class="fas fa-bolt text-blue-500 mr-2"></i>
+                                        <span>GPT-4</span>
+                                    </div>
+                                    <div class="model-option" data-model="gemini">
+                                        <i class="fas fa-robot text-purple-500 mr-2"></i>
+                                        <span>Gemini</span>
+                                    </div>
+                                    <div class="model-option" data-model="deepseek">
+                                        <i class="fas fa-brain text-green-500 mr-2"></i>
+                                        <span>DeepSeek</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button id="send-button" class="p-2 rounded-md bg-blue-600 text-white hover:bg-blue-700">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">LocalVakil may produce inaccurate information about law. Always verify with official sources.</p>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Mobile Bottom Navigation -->
+    <div class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around py-2">
+        <button class="p-2 text-blue-600">
+            <i class="fas fa-comment-dots text-xl"></i>
+        </button>
+        <button class="p-2 text-gray-500">
+            <i class="fas fa-book text-xl"></i>
+        </button>
+        <button class="p-2 text-gray-500">
+            <i class="fas fa-file-alt text-xl"></i>
+        </button>
+        <button class="p-2 text-gray-500">
+            <i class="fas fa-user text-xl"></i>
+        </button>
+    </div>
+
+    <script>
+        // Simulated database for demo purposes
+        const users = [];
+        const chatHistories = {};
+        
+        // Sample chat data for each subject
+        const sampleChats = {
+            constitution: [
+                {
+                    sender: 'user',
+                    content: 'Can you explain the basic structure doctrine?'
+                },
+                {
+                    sender: 'ai',
+                    content: 'The Basic Structure Doctrine was established in the landmark case of Kesavananda Bharati v. State of Kerala (1973). It holds that while Parliament has the power to amend the Constitution under Article 368, it cannot alter its "basic structure". The Supreme Court did not explicitly define what constitutes the basic structure, but it includes features like supremacy of the Constitution, republican and democratic form of government, secular character, separation of powers, and federalism. This doctrine acts as a limitation on the amending power of Parliament.'
+                }
+            ],
+            ipc: [
+                {
+                    sender: 'user',
+                    content: 'What is the difference between culpable homicide and murder?'
+                },
+                {
+                    sender: 'ai',
+                    content: 'Culpable homicide is defined under Section 299 IPC, while murder is defined under Section 300 IPC. The key difference lies in the degree of intention and knowledge:\n\n1. Culpable homicide becomes murder when the act is done with the intention of causing death (Clause 1 of S.300)\n2. Or with the intention of causing such bodily injury as the offender knows to be likely to cause death (Clause 2)\n3. Or with the intention of causing bodily injury sufficient in the ordinary course of nature to cause death (Clause 3)\n4. Or if the person committing the act knows that it is so imminently dangerous that it must in all probability cause death (Clause 4)\n\nAll murders are culpable homicide, but not all culpable homicides are murder.'
+                }
+            ],
+            contract: [
+                {
+                    sender: 'user',
+                    content: 'What are the essential elements of a valid contract?'
+                },
+                {
+                    sender: 'ai',
+                    content: 'According to Section 10 of the Indian Contract Act, 1872, the essential elements of a valid contract are:\n\n1. Offer and Acceptance: There must be a lawful offer by one party and a lawful acceptance by the other.\n2. Intention to create legal relations: The parties must intend to create legal obligations.\n3. Lawful consideration: There must be something of value exchanged between the parties.\n4. Capacity of parties: The parties must be competent to contract (age of majority, sound mind, not disqualified by law).\n5. Free consent: The consent of the parties must be free from coercion, undue influence, fraud, misrepresentation or mistake.\n6. Lawful object: The object of the agreement must be lawful and not opposed to public policy.\n7. Certainty and possibility of performance: The terms must be clear and capable of being performed.'
+                }
+            ],
+            property: [
+                {
+                    sender: 'user',
+                    content: 'What are the different types of mortgages under the Transfer of Property Act?'
+                },
+                {
+                    sender: 'ai',
+                    content: 'The Transfer of Property Act, 1882 recognizes six types of mortgages under Section 58:\n\n1. Simple Mortgage (Section 58(b)): The mortgagor binds himself personally to pay without transferring possession.\n2. Mortgage by Conditional Sale (Section 58(c)): The mortgagor ostensibly sells the property with a condition that on default, the sale becomes absolute.\n3. Usufructuary Mortgage (Section 58(d)): The mortgagor delivers possession to the mortgagee who receives rents and profits in lieu of interest.\n4. English Mortgage (Section 58(e)): The mortgagor binds himself to repay and transfers the property absolutely to the mortgagee with a proviso for retransfer.\n5. Mortgage by Deposit of Title Deeds (Section 58(f)): Also called equitable mortgage, created by delivering title deeds with intent to create security.\n6. Anomalous Mortgage (Section 58(g)): A mortgage that doesn\'t fall into any of the above categories.'
+                }
+            ],
+            torts: [
+                {
+                    sender: 'user',
+                    content: 'What are the essential elements of the tort of negligence?'
+                },
+                {
+                    sender: 'ai',
+                    content: 'The tort of negligence requires the following essential elements:\n\n1. Duty of Care: The defendant must owe a legal duty of care to the plaintiff. This was established in Donoghue v Stevenson (1932).\n2. Breach of Duty: The defendant must have failed to meet the standard of care expected (reasonable man test).\n3. Causation: The breach must have caused the damage (both factual causation and legal causation/remoteness of damage).\n4. Damage: The plaintiff must have suffered actual damage (either physical injury, property damage or financial loss).\n\nIn India, the principle was applied in cases like Municipal Corporation of Delhi v Subhagwanti (1966) where the clock tower collapsed due to poor maintenance.'
+                }
+            ],
+            evidence: [
+                {
+                    sender: 'user',
+                    content: 'What is the difference between relevancy and admissibility of evidence?'
+                },
+                {
+                    sender: 'ai',
+                    content: 'Relevancy and admissibility are distinct but related concepts in the Indian Evidence Act, 1872:\n\nRelevancy (Sections 5-55):\n- Refers to the logical connection between facts\n- A fact is relevant if it makes the existence or non-existence of another fact probable\n- All relevant facts may not be admissible\n\nAdmissibility (Sections 56-100):\n- Refers to whether the evidence can be considered by the court\n- Depends on legal rules (e.g., hearsay is generally inadmissible)\n- All admissible evidence must be relevant\n\nExample: A confession made to police is relevant but generally inadmissible under Section 25 of the Evidence Act.'
+                }
+            ],
+            family: [
+                {
+                    sender: 'user',
+                    content: 'What are the grounds for divorce under Hindu Marriage Act?'
+                },
+                {
+                    sender: 'ai',
+                    content: 'Under Section 13 of the Hindu Marriage Act, 1955, the grounds for divorce are:\n\n1. Adultery\n2. Cruelty (physical or mental)\n3. Desertion for at least 2 years\n4. Conversion to another religion\n5. Incurable unsoundness of mind\n6. Virulent and incurable leprosy\n7. Venereal disease in communicable form\n8. Presumption of death (not heard of as alive for 7 years)\n9. No resumption of cohabitation after judicial separation for 1 year\n10. No restitution of conjugal rights for 1 year after decree\n\nAdditionally, Section 13B provides for divorce by mutual consent where both parties agree and have lived separately for 1 year.'
+                }
+            ],
+            tax: [
+                {
+                    sender: 'user',
+                    content: 'What are the different heads of income under the Income Tax Act?'
+                },
+                {
+                    sender: 'ai',
+                    content: 'The Income Tax Act, 1961 classifies income under five heads (Section 14):\n\n1. Income from Salaries (Section 15-17)\n2. Income from House Property (Section 22-27)\n3. Profits and Gains of Business or Profession (Section 28-44)\n4. Capital Gains (Section 45-55)\n5. Income from Other Sources (Section 56-59)\n\nThese heads are mutually exclusive - a particular income can be taxed under only one head. The computation rules differ for each head. After computing income under each head, they are aggregated to arrive at Gross Total Income, from which deductions under Chapter VI-A are subtracted to arrive at Total Income.'
+                }
+            ],
+            cyber: [
+                {
+                    sender: 'user',
+                    content: 'What are the penalties under the IT Act for cyber crimes?'
+                },
+                {
+                    sender: 'ai',
+                    content: 'The Information Technology Act, 2000 prescribes penalties for various cyber crimes:\n\n1. Section 65 (Tampering with computer source documents): Up to 3 years imprisonment or ₹2 lakh fine or both\n2. Section 66 (Computer related offenses): Up to 3 years imprisonment or ₹5 lakh fine or both\n3. Section 66B (Receiving stolen computer resource): Up to 3 years imprisonment or ₹1 lakh fine or both\n4. Section 66C (Identity theft): Up to 3 years imprisonment and ₹1 lakh fine\n5. Section 66D (Cheating by personation using computer): Up to 3 years imprisonment and ₹1 lakh fine\n6. Section 66E (Violation of privacy): Up to 3 years imprisonment or ₹2 lakh fine or both\n7. Section 67 (Publishing obscene material): First conviction up to 3 years and ₹5 lakh fine, subsequent up to 5 years and ₹10 lakh fine'
+                }
+            ],
+            environment: [
+                {
+                    sender: 'user',
+                    content: 'What are the important environmental laws in India?'
+                },
+                {
+                    sender: 'ai',
+                    content: 'India has several important environmental laws:\n\n1. The Water (Prevention and Control of Pollution) Act, 1974\n2. The Air (Prevention and Control of Pollution) Act, 1981\n3. The Environment (Protection) Act, 1986 (Umbrella legislation)\n4. The Wildlife Protection Act, 1972\n5. The Forest (Conservation) Act, 1980\n6. The Biological Diversity Act, 2002\n7. The National Green Tribunal Act, 2010\n\nThese laws establish regulatory bodies like the Central Pollution Control Board (CPCB) and State Pollution Control Boards (SPCBs). The National Green Tribunal, established in 2010, handles environmental disputes and provides compensation for damages.'
+                }
+            ],
+            humanrights: [
+                {
+                    sender: 'user',
+                    content: 'What are the fundamental rights under the Indian Constitution?'
+                },
+                {
+                    sender: 'ai',
+                    content: 'The Fundamental Rights under Part III (Articles 12-35) of the Indian Constitution are:\n\n1. Right to Equality (Articles 14-18):\n   - Equality before law (Article 14)\n   - Prohibition of discrimination (Article 15)\n   - Equality of opportunity (Article 16)\n   - Abolition of untouchability (Article 17)\n   - Abolition of titles (Article 18)\n\n2. Right to Freedom (Articles 19-22):\n   - Freedom of speech, assembly, association, movement, residence, profession (Article 19)\n   - Protection in conviction for offenses (Article 20)\n   - Right to life and personal liberty (Article 21)\n   - Right to education (Article 21A)\n   - Protection against arrest and detention (Article 22)\n\n3. Right against Exploitation (Articles 23-24)\n4. Right to Freedom of Religion (Articles 25-28)\n5. Cultural and Educational Rights (Articles 29-30)\n6. Right to Constitutional Remedies (Article 32)'
+                }
+            ],
+            corporate: [
+                {
+                    sender: 'user',
+                    content: 'What are the duties of directors under the Companies Act?'
+                },
+                {
+                    sender: 'ai',
+                    content: 'The Companies Act, 2013 outlines various duties of directors under Section 166:\n\n1. To act in good faith for the benefit of the company, its employees, shareholders and community\n2. To exercise duties with due and reasonable care, skill and diligence\n3. To not involve in situations with conflict of interest\n4. To not achieve undue gain or advantage (either directly or indirectly)\n5. To not assign office\n\nAdditional duties include:\n- To disclose any interest in company contracts (Section 184)\n- To attend board meetings (Section 173)\n- To comply with provisions regarding related party transactions (Section 188)\n- To ensure proper books of accounts are maintained (Section 128)\n\nViolation of these duties can lead to penalties or even imprisonment.'
+                }
+            ],
+            previous: [
+                {
+                    sender: 'user',
+                    content: 'Can you give me a sample question from last year\'s LLB exam on Constitutional Law?'
+                },
+                {
+                    sender: 'ai',
+                    content: 'Here\'s a question from Delhi University\'s LLB exam 2022:\n\n"Critically examine the doctrine of basic structure of the Constitution with reference to important Supreme Court judgments. How has this doctrine evolved over time?" (20 marks)\n\nSuggested approach:\n1. Begin with explaining the doctrine (Kesavananda Bharati case)\n2. Discuss subsequent cases that expanded it (Indira Gandhi v. Raj Narain, Minerva Mills, etc.)\n3. Analyze judicial trends in applying the doctrine\n4. Critically examine its impact on parliamentary sovereignty\n5. Conclude with your assessment of its role in Indian constitutionalism"
+                }
+            ],
+            mocks: [
+                {
+                    sender: 'user',
+                    content: 'Can you give me a mock question on IPC for practice?'
+                },
+                {
+                    sender: 'ai',
+                    content: 'Here\'s a mock question for IPC:\n\n"X, a doctor, intentionally does not attend to Y, his neighbor with whom he has enmity, knowing that Y is suffering from a heart attack and needs immediate medical attention. Y dies as a result. Discuss the criminal liability of X under the IPC." (15 marks)\n\nKey points to discuss:\n1. Whether X had a legal duty to care for Y (Section 304 IPC)\n2. Concept of culpable homicide (Section 299)\n3. Whether this amounts to murder (Section 300)\n4. Applicability of exceptions (if any)\n5. Relevant case laws like R v. Instan, Pittwood\n6. Conclusion on X\'s liability\n\nTime yourself for 20 minutes to answer this question.'
+                }
+            ],
+            viva: [
+                {
+                    sender: 'user',
+                    content: 'What are some common viva questions on Contract Law?'
+                },
+                {
+                    sender: 'ai',
+                    content: 'Here are common viva questions on Contract Law:\n\n1. What is the difference between an agreement and a contract?\n2. Explain "consensus ad idem" with an example.\n3. What are the exceptions to the rule "no consideration, no contract"?\n4. How is a contract discharged by breach? Explain anticipatory breach.\n5. What is the difference between fraud and misrepresentation?\n6. Explain quantum meruit with an example.\n7. What are quasi-contracts? Explain different types.\n8. How is a contract of indemnity different from guarantee?\n9. What are the rights of an unpaid seller?\n10. Explain the rule in Rylands v. Fletcher.\n\nTip: Prepare short, clear answers (1-2 minutes each) and be ready with case law examples for each concept.'
+                }
+            ]
+        };
+        
+        // DOM Elements
+        const authModal = document.getElementById('authModal');
+        const loginForm = document.getElementById('loginForm');
+        const registerForm = document.getElementById('registerForm');
+        const loginTab = document.getElementById('loginTab');
+        const registerTab = document.getElementById('registerTab');
+        const switchToRegister = document.getElementById('switchToRegister');
+        const switchToLogin = document.getElementById('switchToLogin');
+        const loginButton = document.getElementById('loginButton');
+        const registerButton = document.getElementById('registerButton');
+        const authButton = document.getElementById('authButton');
+        const userProfileSection = document.getElementById('userProfileSection');
+        const userName = document.getElementById('userName');
+        const userEmail = document.getElementById('userEmail');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const viewHistoryBtn = document.getElementById('viewHistoryBtn');
+        const chatHistorySection = document.getElementById('chatHistorySection');
+        const chatHistoryList = document.getElementById('chatHistoryList');
+        const donateBtn = document.getElementById('donateBtn');
+        const donateModal = document.getElementById('donateModal');
+        const cancelDonate = document.getElementById('cancelDonate');
+        const confirmDonate = document.getElementById('confirmDonate');
+        const themeToggle = document.getElementById('themeToggle');
+        const themeIcon = document.getElementById('themeIcon');
+        const modelSelectorBtn = document.getElementById('modelSelectorBtn');
+        const modelSelector = document.getElementById('modelSelector');
+        const modelOptions = document.querySelectorAll('.model-option');
+        
+        // Current user state
+        let currentUser = null;
+        let currentChatId = null;
+        let currentModel = 'gpt-4';
+        
+        // Initialize the app
+        function initApp() {
+            // Check if user is logged in (in a real app, this would check localStorage or cookies)
+            const storedUser = localStorage.getItem('currentUser');
+            if (storedUser) {
+                currentUser = JSON.parse(storedUser);
+                updateUIForLoggedInUser();
+            }
+            
+            // Generate a unique chat ID for this session
+            currentChatId = generateChatId();
+            
+            // If user is logged in, load their chat history
+            if (currentUser) {
+                loadChatHistory();
+            }
+        }
+        
+        // Generate a unique chat ID
+        function generateChatId() {
+            return 'chat-' + Date.now();
+        }
+        
+        // Update UI when user logs in
+        function updateUIForLoggedInUser() {
+            userProfileSection.style.display = 'block';
+            userName.textContent = currentUser.name;
+            userEmail.textContent = currentUser.email;
+            authButton.innerHTML = '<i class="fas fa-user-check text-blue-500"></i>';
+        }
+        
+        // Update UI when user logs out
+        function updateUIForLoggedOutUser() {
+            userProfileSection.style.display = 'none';
+            chatHistorySection.style.display = 'none';
+            authButton.innerHTML = '<i class="fas fa-user text-gray-500"></i>';
+        }
+        
+        // Load chat history for the current user
+        function loadChatHistory() {
+            if (!currentUser) return;
+            
+            // In a real app, this would fetch from a database
+            const userChats = chatHistories[currentUser.email] || [];
+            
+            chatHistoryList.innerHTML = '';
+            
+            if (userChats.length === 0) {
+                chatHistoryList.innerHTML = '<p class="text-sm text-gray-500">No chat history yet</p>';
+                return;
+            }
+            
+            userChats.forEach(chat => {
+                const chatItem = document.createElement('div');
+                chatItem.className = 'text-sm p-2 rounded-md hover:bg-gray-100 cursor-pointer flex justify-between items-center';
+                chatItem.innerHTML = `
+                    <div class="truncate flex-1">${chat.subject} - ${new Date(chat.timestamp).toLocaleString()}</div>
+                    <button class="delete-chat p-1 text-gray-400 hover:text-red-500" data-chatid="${chat.id}">
+                        <i class="fas fa-trash-alt text-xs"></i>
+                    </button>
+                `;
+                
+                chatItem.addEventListener('click', () => {
+                    loadChat(chat.id);
+                });
+                
+                chatHistoryList.appendChild(chatItem);
+            });
+        }
+        
+        // Load a specific chat
+        function loadChat(chatId) {
+            if (!currentUser) return;
+            
+            const userChats = chatHistories[currentUser.email] || [];
+            const chat = userChats.find(c => c.id === chatId);
+            
+            if (!chat) return;
+            
+            // Update current chat ID
+            currentChatId = chatId;
+            
+            // Clear current chat
+            const chatMessages = document.getElementById('chat-messages');
+            chatMessages.innerHTML = '';
+            
+            // Load messages
+            chat.messages.forEach(msg => {
+                const msgDiv = document.createElement('div');
+                msgDiv.className = msg.sender === 'user' ? 'user-message p-4' : 'ai-message p-4';
+                
+                if (msg.sender === 'ai') {
+                    msgDiv.innerHTML = `
+                        <div class="font-semibold text-gray-700 mb-1 flex items-center">
+                            <i class="fas fa-landmark mr-2 text-blue-500"></i> ${chat.subject} Expert
+                        </div>
+                        <p class="text-gray-800">${msg.content}</p>
+                    `;
+                } else {
+                    msgDiv.textContent = msg.content;
+                }
+                
+                chatMessages.appendChild(msgDiv);
+            });
+            
+            // Scroll to bottom
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            
+            // Hide history section on mobile
+            if (window.innerWidth <= 768) {
+                sidebar.classList.remove('sidebar-open');
+            }
+        }
+        
+        // Save chat to history
+        function saveChat(subject, messages) {
+            if (!currentUser) return;
+            
+            const userChats = chatHistories[currentUser.email] || [];
+            const existingChatIndex = userChats.findIndex(c => c.id === currentChatId);
+            
+            const chatData = {
+                id: currentChatId,
+                subject: subject,
+                timestamp: Date.now(),
+                messages: messages
+            };
+            
+            if (existingChatIndex !== -1) {
+                // Update existing chat
+                userChats[existingChatIndex] = chatData;
+            } else {
+                // Add new chat
+                userChats.push(chatData);
+            }
+            
+            // Save to "database"
+            chatHistories[currentUser.email] = userChats;
+            
+            // Update UI
+            loadChatHistory();
+        }
+        
+        // Toggle dark/light theme
+        function toggleTheme() {
+            if (document.documentElement.classList.contains('dark')) {
+                document.documentElement.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+                themeIcon.classList.remove('fa-sun');
+                themeIcon.classList.add('fa-moon');
+            } else {
+                document.documentElement.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+                themeIcon.classList.remove('fa-moon');
+                themeIcon.classList.add('fa-sun');
+            }
+        }
+        
+        // Toggle model selector dropdown
+        function toggleModelSelector() {
+            modelSelector.classList.toggle('active');
+        }
+        
+        // Select a different AI model
+        function selectModel(e) {
+            const selectedModel = e.currentTarget.getAttribute('data-model');
+            currentModel = selectedModel;
+            
+            // Update active state in dropdown
+            modelOptions.forEach(option => {
+                option.classList.remove('active');
+                if (option.getAttribute('data-model') === selectedModel) {
+                    option.classList.add('active');
+                }
+            });
+            
+            // Update button text
+            modelSelectorBtn.innerHTML = `
+                <i class="fas fa-robot mr-1"></i> ${selectedModel}
+                <i class="fas fa-chevron-down ml-1 text-xs"></i>
+            `;
+            
+            // Close dropdown
+            modelSelector.classList.remove('active');
+            
+            // Show model change confirmation
+            const chatMessages = document.getElementById('chat-messages');
+            const confirmationDiv = document.createElement('div');
+            confirmationDiv.className = 'ai-message p-4';
+            confirmationDiv.innerHTML = `
+                <div class="font-semibold text-gray-700 mb-1 flex items-center">
+                    <i class="fas fa-info-circle mr-2 text-blue-500"></i> Model Changed
+                </div>
+                <p class="text-gray-800">You are now chatting with <strong>${selectedModel}</strong>. How can I assist you with your legal studies today?</p>
+            `;
+            chatMessages.appendChild(confirmationDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        
+        // Event Listeners
+        authButton.addEventListener('click', () => {
+            if (currentUser) {
+                // Toggle sidebar on mobile
+                if (window.innerWidth <= 768) {
+                    sidebar.classList.toggle('sidebar-open');
+                }
+            } else {
+                authModal.style.display = 'flex';
+            }
+        });
+        
+        loginTab.addEventListener('click', () => {
+            loginTab.classList.add('active');
+            registerTab.classList.remove('active');
+            loginForm.style.display = 'block';
+            registerForm.style.display = 'none';
+        });
+        
+        registerTab.addEventListener('click', () => {
+            registerTab.classList.add('active');
+            loginTab.classList.remove('active');
+            registerForm.style.display = 'block';
+            loginForm.style.display = 'none';
+        });
+        
+        switchToRegister.addEventListener('click', () => {
+            registerTab.click();
+        });
+        
+        switchToLogin.addEventListener('click', () => {
+            loginTab.click();
+        });
+        
+        loginButton.addEventListener('click', () => {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            // Simple validation
+            if (!email || !password) {
+                alert('Please enter both email and password');
+                return;
+            }
+            
+            // Check if user exists (in a real app, this would be an API call)
+            const user = users.find(u => u.email === email && u.password === password);
+            
+            if (user) {
+                // Login successful
+                currentUser = user;
+                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                authModal.style.display = 'none';
+                updateUIForLoggedInUser();
+                loadChatHistory();
+                
+                // Show welcome back message
+                const chatMessages = document.getElementById('chat-messages');
+                const welcomeDiv = document.createElement('div');
+                welcomeDiv.className = 'ai-message p-4';
+                welcomeDiv.innerHTML = `
+                    <div class="font-semibold text-gray-700 mb-1 flex items-center">
+                        <i class="fas fa-landmark mr-2 text-blue-500"></i> ${document.getElementById('current-subject').textContent}
+                    </div>
+                    <p class="text-gray-800">Welcome back, ${user.name}! Your chat history has been loaded. How can I assist you with your legal studies today?</p>
+                `;
+                chatMessages.appendChild(welcomeDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            } else {
+                alert('Invalid email or password');
+            }
+        });
+        
+        registerButton.addEventListener('click', () => {
+            const name = document.getElementById('registerName').value;
+            const email = document.getElementById('registerEmail').value;
+            const password = document.getElementById('registerPassword').value;
+            const confirmPassword = document.getElementById('registerConfirmPassword').value;
+            
+            // Validation
+            if (!name || !email || !password || !confirmPassword) {
+                alert('Please fill in all fields');
+                return;
+            }
+            
+            if (password !== confirmPassword) {
+                alert('Passwords do not match');
+                return;
+            }
+            
+            // Check if user already exists
+            if (users.some(u => u.email === email)) {
+                alert('Email already registered');
+                return;
+            }
+            
+            // Create new user (in a real app, this would be an API call)
+            const newUser = {
+                name: name,
+                email: email,
+                password: password
+            };
+            
+            users.push(newUser);
+            currentUser = newUser;
+            localStorage.setItem('currentUser', JSON.stringify(newUser));
+            authModal.style.display = 'none';
+            updateUIForLoggedInUser();
+            
+            // Show welcome message
+            const chatMessages = document.getElementById('chat-messages');
+            const welcomeDiv = document.createElement('div');
+            welcomeDiv.className = 'ai-message p-4';
+            welcomeDiv.innerHTML = `
+                <div class="font-semibold text-gray-700 mb-1 flex items-center">
+                    <i class="fas fa-landmark mr-2 text-blue-500"></i> ${document.getElementById('current-subject').textContent}
+                </div>
+                <p class="text-gray-800">Welcome to LocalVakil, ${name}! Your account has been created. Now you can save your chat history across devices. How can I assist you with your legal studies today?</p>
+            `;
+            chatMessages.appendChild(welcomeDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        });
+        
+        logoutBtn.addEventListener('click', () => {
+            currentUser = null;
+            localStorage.removeItem('currentUser');
+            updateUIForLoggedOutUser();
+            
+            // Show logged out message
+            const chatMessages = document.getElementById('chat-messages');
+            const loggedOutDiv = document.createElement('div');
+            loggedOutDiv.className = 'ai-message p-4';
+            loggedOutDiv.innerHTML = `
+                <div class="font-semibold text-gray-700 mb-1 flex items-center">
+                    <i class="fas fa-landmark mr-2 text-blue-500"></i> ${document.getElementById('current-subject').textContent}
+                </div>
+                <p class="text-gray-800">You have been logged out. Your current chat will continue, but it won't be saved unless you log in again.</p>
+            `;
+            chatMessages.appendChild(loggedOutDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            
+            // Generate a new chat ID for the anonymous session
+            currentChatId = generateChatId();
+        });
+        
+        viewHistoryBtn.addEventListener('click', () => {
+            chatHistorySection.style.display = chatHistorySection.style.display === 'none' ? 'block' : 'none';
+        });
+        
+        // Donation functionality
+        donateBtn.addEventListener('click', () => {
+            donateModal.style.display = 'flex';
+        });
+        
+        cancelDonate.addEventListener('click', () => {
+            donateModal.style.display = 'none';
+        });
+        
+        confirmDonate.addEventListener('click', () => {
+            const customAmount = document.getElementById('customAmount').value;
+            let amount = 0;
+            
+            // Check if a preset amount was selected
+            const selectedOption = document.querySelector('.donate-option.border-blue-500');
+            if (selectedOption) {
+                amount = parseInt(selectedOption.querySelector('.text-2xl').textContent.replace('₹', ''));
+            } else if (customAmount) {
+                amount = parseInt(customAmount);
+            }
+            
+            if (amount <= 0) {
+                alert('Please select or enter a valid donation amount');
+                return;
+            }
+            
+            // In a real app, this would process a payment
+            alert(`Thank you for your donation of ₹${amount}! This helps us maintain and improve LocalVakil.`);
+            donateModal.style.display = 'none';
+            
+            // Show thank you message in chat
+            const chatMessages = document.getElementById('chat-messages');
+            const thankYouDiv = document.createElement('div');
+            thankYouDiv.className = 'ai-message p-4';
+            thankYouDiv.innerHTML = `
+                <div class="font-semibold text-gray-700 mb-1 flex items-center">
+                    <i class="fas fa-heart mr-2 text-pink-500"></i> Thank You!
+                </div>
+                <p class="text-gray-800">We truly appreciate your donation of ₹${amount}. Your support helps us keep LocalVakil free for all law students while continuing to improve our services.</p>
+            `;
+            chatMessages.appendChild(thankYouDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        });
+        
+        // Highlight selected donation option
+        document.querySelectorAll('.donate-option').forEach(option => {
+            option.addEventListener('click', () => {
+                document.querySelectorAll('.donate-option').forEach(opt => {
+                    opt.classList.remove('border-blue-500');
+                });
+                option.classList.add('border-blue-500');
+                document.getElementById('customAmount').value = '';
+            });
+        });
+        
+        // Clear preset selection when entering custom amount
+        document.getElementById('customAmount').addEventListener('focus', () => {
+            document.querySelectorAll('.donate-option').forEach(opt => {
+                opt.classList.remove('border-blue-500');
+            });
+        });
+        
+        // Mobile menu toggle
+        const mobileMenuButton = document.getElementById('mobileMenuButton');
+        const sidebar = document.getElementById('sidebar');
+        
+        mobileMenuButton.addEventListener('click', () => {
+            sidebar.classList.toggle('sidebar-open');
+        });
+        
+        // Subject switching
+        const subjectButtons = document.querySelectorAll('.subject-btn');
+        const currentSubjectElement = document.getElementById('current-subject');
+        const chatMessages = document.getElementById('chat-messages');
+        
+        subjectButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const subject = button.getAttribute('data-subject');
+                const subjectName = button.textContent.trim();
+                
+                // Update current subject display
+                currentSubjectElement.textContent = `${subjectName} Assistant`;
+                
+                // Close mobile menu if open
+                if (window.innerWidth <= 768) {
+                    sidebar.classList.remove('sidebar-open');
+                }
+                
+                // Save current chat before switching
+                if (currentUser) {
+                    const messages = [];
+                    document.querySelectorAll('#chat-messages > div').forEach(msgDiv => {
+                        const isUser = msgDiv.classList.contains('user-message');
+                        messages.push({
+                            sender: isUser ? 'user' : 'ai',
+                            content: isUser ? msgDiv.textContent : msgDiv.querySelector('p').textContent
+                        });
+                    });
+                    
+                    if (messages.length > 0) {
+                        saveChat(currentSubjectElement.textContent.replace(' Assistant', ''), messages);
+                    }
+                }
+                
+                // Generate a new chat ID for the new subject
+                currentChatId = generateChatId();
+                
+                // Clear chat messages
+                chatMessages.innerHTML = '';
+                
+                // Add new welcome message based on subject
+                let welcomeMessage = '';
+                let icon = 'fa-balance-scale';
+                let iconColor = 'text-blue-500';
+                
+                switch(subject) {
+                    case 'constitution':
+                        welcomeMessage = `Welcome to LocalVakil! I'm your AI assistant specialized in Constitutional Law of India. I can help you with Fundamental Rights, DPSP, Constitutional Amendments, and landmark judgments. What would you like to learn about today?`;
+                        icon = 'fa-landmark';
+                        iconColor = 'text-blue-500';
+                        break;
+                    case 'ipc':
+                        welcomeMessage = `Welcome to LocalVakil! I'm your AI assistant for Indian Penal Code and Criminal Procedure Code. I can explain sections, punishments, procedures, and important case laws. What's your question?`;
+                        icon = 'fa-gavel';
+                        iconColor = 'text-red-500';
+                        break;
+                    case 'contract':
+                        welcomeMessage = `Welcome to LocalVakil! I'm your Contract Law expert. I can help with offer & acceptance, consideration, breach of contract, and remedies under the Indian Contract Act, 1872. How can I assist you?`;
+                        icon = 'fa-file-signature';
+                        iconColor = 'text-green-500';
+                        break;
+                    case 'property':
+                        welcomeMessage = `Welcome to LocalVakil! I specialize in Property Law including Transfer of Property Act, easements, mortgages, and sale deeds. What would you like to know?`;
+                        icon = 'fa-home';
+                        iconColor = 'text-yellow-500';
+                        break;
+                    case 'torts':
+                        welcomeMessage = `Welcome to LocalVakil! I'm your Law of Torts assistant. I can explain negligence, nuisance, defamation, strict liability, and remedies available. What's your query?`;
+                        icon = 'fa-user-injured';
+                        iconColor = 'text-purple-500';
+                        break;
+                    case 'evidence':
+                        welcomeMessage = `Welcome to LocalVakil! I'm your Evidence Act expert. I can help with burden of proof, relevancy of facts, examination of witnesses, and documentary evidence. How may I help?`;
+                        icon = 'fa-search';
+                        iconColor = 'text-indigo-500';
+                        break;
+                    case 'family':
+                        welcomeMessage = `Welcome to LocalVakil! I specialize in Family Law including Hindu Law, Muslim Law, marriage, divorce, adoption, and succession. What would you like to learn?`;
+                        icon = 'fa-users';
+                        iconColor = 'text-pink-500';
+                        break;
+                    case 'tax':
+                        welcomeMessage = `Welcome to LocalVakil! I'm your Tax Law assistant. I can explain Income Tax, GST, deductions, exemptions, and important case laws. What's your question?`;
+                        icon = 'fa-rupee-sign';
+                        iconColor = 'text-teal-500';
+                        break;
+                    case 'cyber':
+                        welcomeMessage = `Welcome to LocalVakil! I specialize in Cyber Law including IT Act, data protection, cyber crimes, and digital evidence. How can I assist you?`;
+                        icon = 'fa-laptop-code';
+                        iconColor = 'text-blue-400';
+                        break;
+                    case 'environment':
+                        welcomeMessage = `Welcome to LocalVakil! I'm your Environmental Law expert. I can help with pollution laws, forest conservation, wildlife protection, and NGT cases. What would you like to know?`;
+                        icon = 'fa-leaf';
+                        iconColor = 'text-green-400';
+                        break;
+                    case 'humanrights':
+                        welcomeMessage = `Welcome to LocalVakil! I specialize in Human Rights Law including constitutional provisions, international conventions, and remedies. How may I help?`;
+                        icon = 'fa-hands-helping';
+                        iconColor = 'text-red-400';
+                        break;
+                    case 'corporate':
+                        welcomeMessage = `Welcome to LocalVakil! I'm your Corporate Law assistant. I can explain Companies Act, corporate governance, directors' duties, and shareholder rights. What's your query?`;
+                        icon = 'fa-building';
+                        iconColor = 'text-gray-400';
+                        break;
+                    case 'previous':
+                        welcomeMessage = `Welcome to LocalVakil! I can help you prepare for your law exams with previous year question papers, model answers, and important questions. Which exam are you preparing for?`;
+                        icon = 'fa-book-open';
+                        iconColor = 'text-purple-400';
+                        break;
+                    case 'mocks':
+                        welcomeMessage = `Welcome to LocalVakil! Let's practice with mock tests for your law exams. I can generate questions, evaluate answers, and provide feedback. Ready to test your knowledge?`;
+                        icon = 'fa-clipboard-check';
+                        iconColor = 'text-yellow-400';
+                        break;
+                    case 'viva':
+                        welcomeMessage = `Welcome to LocalVakil! I'll help you prepare for your law viva voce. I can simulate viva questions, suggest answers, and provide tips for presentation. Shall we begin?`;
+                        icon = 'fa-comments';
+                        iconColor = 'text-indigo-400';
+                        break;
+                    default:
+                        welcomeMessage = `Welcome to LocalVakil! I'm your AI legal assistant. How can I help you with your legal studies today?`;
+                }
+                
+                const welcomeDiv = document.createElement('div');
+                welcomeDiv.className = 'ai-message p-4';
+                welcomeDiv.innerHTML = `
+                    <div class="font-semibold text-gray-700 mb-1 flex items-center">
+                        <i class="fas ${icon} mr-2 ${iconColor}"></i> ${subjectName} Expert
+                    </div>
+                    <p class="text-gray-800">${welcomeMessage}</p>
+                `;
+                
+                chatMessages.appendChild(welcomeDiv);
+                
+                // Add sample chat for this subject if available
+                if (sampleChats[subject]) {
+                    sampleChats[subject].forEach(msg => {
+                        const msgDiv = document.createElement('div');
+                        msgDiv.className = msg.sender === 'user' ? 'user-message p-4' : 'ai-message p-4';
+                        
+                        if (msg.sender === 'ai') {
+                            msgDiv.innerHTML = `
+                                <div class="font-semibold text-gray-700 mb-1 flex items-center">
+                                    <i class="fas ${icon} mr-2 ${iconColor}"></i> ${subjectName} Expert
+                                </div>
+                                <p class="text-gray-800">${msg.content}</p>
+                            `;
+                        } else {
+                            msgDiv.textContent = msg.content;
+                        }
+                        
+                        chatMessages.appendChild(msgDiv);
+                    });
+                }
+                
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            });
+        });
+        
+        // Chat functionality
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (message === '') return;
+            
+            // Add user message to chat
+            const userMessageDiv = document.createElement('div');
+            userMessageDiv.className = 'user-message p-4';
+            userMessageDiv.textContent = message;
+            chatMessages.appendChild(userMessageDiv);
+            
+            // Clear input
+            messageInput.value = '';
+            
+            // Add typing indicator
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'ai-message p-4';
+            typingDiv.innerHTML = `
+                <div class="font-semibold text-gray-700 mb-1 flex items-center">
+                    <i class="fas fa-landmark mr-2 text-blue-500"></i> ${currentSubjectElement.textContent}
+                </div>
+                <div class="flex space-x-1">
+                    <div class="typing-indicator"></div>
+                    <div class="typing-indicator"></div>
+                    <div class="typing-indicator"></div>
+                </div>
+            `;
+            chatMessages.appendChild(typingDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            
+            // Simulate AI response (in a real app, this would be an API call)
+            setTimeout(() => {
+                // Remove typing indicator
+                chatMessages.removeChild(typingDiv);
+                
+                // Add AI response
+                const aiMessageDiv = document.createElement('div');
+                aiMessageDiv.className = 'ai-message p-4';
+                
+                // Get current subject from the button text
+                const currentSubject = currentSubjectElement.textContent.replace(' Assistant', '');
+                const aiResponse = generateSampleResponse(currentSubject, message);
+                
+                aiMessageDiv.innerHTML = `
+                    <div class="font-semibold text-gray-700 mb-1 flex items-center">
+                        <i class="fas fa-landmark mr-2 text-blue-500"></i> ${currentSubject} Expert
+                    </div>
+                    <p class="text-gray-800">${aiResponse}</p>
+                `;
+                
+                chatMessages.appendChild(aiMessageDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                
+                // Save chat if user is logged in
+                if (currentUser) {
+                    const messages = [];
+                    document.querySelectorAll('#chat-messages > div').forEach(msgDiv => {
+                        const isUser = msgDiv.classList.contains('user-message');
+                        messages.push({
+                            sender: isUser ? 'user' : 'ai',
+                            content: isUser ? msgDiv.textContent : msgDiv.querySelector('p').textContent
+                        });
+                    });
+                    
+                    saveChat(currentSubject, messages);
+                }
+            }, 1500);
+        }
+        
+        function generateSampleResponse(subject, question) {
+            // This is just sample responses for demo purposes
+            // In a real app, you would call your AI API here
+            
+            const lowerQuestion = question.toLowerCase();
+            
+            if (subject.includes('Constitutional')) {
+                if (lowerQuestion.includes('article 14')) {
+                    return `Article 14 of the Indian Constitution guarantees the right to equality before the law and equal protection of the laws within the territory of India. It embodies the general principles of equality and prohibits unreasonable discrimination between persons. The Supreme Court has interpreted this article extensively in landmark cases like E.P. Royappa v. State of Tamil Nadu (1974) which established the doctrine of arbitrariness.`;
+                } else if (lowerQuestion.includes('basic structure')) {
+                    return `The Basic Structure Doctrine was established in the landmark case of Kesavananda Bharati v. State of Kerala (1973). It holds that while Parliament has the power to amend the Constitution under Article 368, it cannot alter its "basic structure". The basic structure includes features like supremacy of the Constitution, republican and democratic form of government, secular character, separation of powers, federalism, etc. This doctrine acts as a limitation on the amending power of Parliament.`;
+                } else {
+                    return `As an AI specialized in Constitutional Law, I can provide detailed explanations about various articles, amendments, and landmark judgments of the Indian Constitution. For example, Fundamental Rights (Articles 12-35), Directive Principles of State Policy (Articles 36-51), emergency provisions (Articles 352-360), and important cases like Maneka Gandhi v. Union of India (1978) which expanded the scope of Article 21. What specific aspect of Constitutional Law are you interested in?`;
+                }
+            } else if (subject.includes('IPC')) {
+                if (lowerQuestion.includes('section 300')) {
+                    return `Section 300 of the Indian Penal Code defines murder. It states that culpable homicide is murder if the act by which the death is caused is done with the intention of causing death, or if it is done with the intention of causing such bodily injury as the offender knows to be likely to cause death, or if it is done with the intention of causing bodily injury to any person and the bodily injury intended to be inflicted is sufficient in the ordinary course of nature to cause death. The exceptions to murder are provided under Section 300 itself.`;
+                } else {
+                    return `The Indian Penal Code (IPC) is the official criminal code of India which defines crimes and provides punishments. I can explain various sections like Section 375 (rape), Section 420 (cheating), Section 498A (cruelty by husband), and important case laws. The Code of Criminal Procedure (CrPC) provides the procedural law for administration of substantive criminal law in India. How can I help you with IPC or CrPC?`;
+                }
+            } else if (subject.includes('Contract')) {
+                if (lowerQuestion.includes('offer and acceptance')) {
+                    return `Under the Indian Contract Act, 1872, a contract is formed when there is a lawful offer by one party and a lawful acceptance of that offer by the other party. Section 2(a) defines proposal/
+</html>
